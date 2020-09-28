@@ -38,6 +38,56 @@ Símbolo : Significado
 [*]     : Recurso modificado/melhorado
 [-]     : Correção de Bug (assim esperamos)
 
+Data: 22/09/2020
+-- ACBrDevice --
+[+] TACBrTagProcessor, Adicionado Evento: "OnAdicionarBlocoResposta", que será
+    invocado, a cada novo bloco de Dados adicionado no Buffer final de resposta.
+
+-- ACBrDeviceBlueTooth --
+[-] Correção da verificação do resultado de TACBrDeviceBlueTooth.PedirPermissoes
+[*] Ajuste em TACBrDeviceBlueTooth.AtivarBlueTooth, para só verificar estado do
+    BlueTooth, após chamar PedirPermissoes
+
+-- ACBrPosPrinter --
+[+] TACBrPosComandos, adicionado o método "Clear".
+[+] TACBrPosPrinterClass, adicionado os métodos virtuais:
+    procedure AntesDecodificar(var ABinaryString: AnsiString);
+    procedure AdicionarBlocoResposta(const ConteudoBloco: AnsiString);
+    procedure DepoisDecodificar(var ABinaryString: AnsiString);
+    - Métodos para permitir que a Classe de Impressora, interfira e costumize o
+      processo de Decodificação das Tags em "TACBrTagProcessor"
+[*] TACBrPosPrinter, expondo a classe: "TagProcessor" como Pública, Read Only.
+[-] Tag '</fn>', não estava desligando "ftFonteB";
+[-] TACBrPosPrinter.EnviarStringDevice, corrigido para não tentar enviar
+    "ComandoInicializa", se o mesmo for vazio.
+
+Data: 17/08/2020
+-- ACBrPosPrinter --
+[-] Correção de A.V., quando destruindo TACBrPosPrinter, que está usando
+    "ModeloExterno"
+    (por: DSA)
+
+Data: 06/08/2020
+-- ACBrDevice --
+[+] Adicionado Porta "NULL", que será atribuido para DeviceType = dtNenhum
+    Util, quando o ACBrPosPrinter é usado com "ModeloExterno", onde a Abertura
+    e Envio de dados ao dispositivo, não será feita por TACBrDevice
+
+-- ACBrPosPrinter --
+[+] Adicionado Modelo "ppExterno", que será selecionado automaticamente, e apenas,
+    se houver alguma classe atribuida a "ModeloExterno"
+[+] Adicionada nova propriedade Publica, "ModeloExterno: TACBrPosPrinterClass"
+    - Permite atribuir ao ACBrPosPrinter, classes de Impressoras, que não são
+      compiladas interamente em ACBrPosPrinter.
+    - Isso pode ser útil, para criar classes de tradução do ACBrPosPrinter, para
+      outras bibliotecas de impressão. Ver exemplo em:
+      Fontes\ACBrTEFD\ACBrPOSPGWebPrinter.pas
+[+] TACBrPosPrinterClass, agora permite que a Classe de impressão, cuide da
+    Tradução de Tags e Blocos, com chamadas aos métodos internos:
+    "TraduzirTag" e "TraduzirTagBloco"
+[-] Modelo "ppTexto", agora usa as razões de Fontes: Condensada=1 e Expandida=1,
+    (por: DSA)
+
 Data: 29/06/2020
 -- ACBrETQClass, ACBrETQPpla, ACBrETQZplII, ACBrETQEpl2 --
 [-] Ajuste para não enviar o comando de página de código, quando ela for

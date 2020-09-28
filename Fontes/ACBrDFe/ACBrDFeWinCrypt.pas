@@ -1227,6 +1227,7 @@ begin
         end;
 
         mBytesLen := Length(mHashBuffer);
+        FillChar(mHashBuffer, mBytesLen, #0);
 
         if Assina then
         begin
@@ -1366,6 +1367,7 @@ begin
         else
         begin
           mBytesLen := Length(mHashBuffer);
+          FillChar(mHashBuffer, mBytesLen, 0);
           // Obtendo o Hash //
           if not CryptGetHashParam(mHash, HP_HASHVAL, @mHashBuffer, mBytesLen, 0) then
             raise Exception.Create('CryptGetHashParam');

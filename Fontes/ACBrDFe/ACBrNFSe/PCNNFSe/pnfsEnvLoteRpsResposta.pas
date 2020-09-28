@@ -399,6 +399,22 @@ begin
       end;
     end;
 
+    if Provedor in [proAbase] then
+    begin
+      i := InfRec.FMsgRetorno.Count;
+      if (Leitor.rExtrai(1, 'ListaMensagemRetornoLote', '', 1) <> '') then
+      begin
+        InfRec.FMsgRetorno.New;
+        InfRec.FMsgRetorno[i].FIdentificacaoRps.Numero := Leitor.rCampo(tcStr, 'Numero');
+        InfRec.FMsgRetorno[i].FIdentificacaoRps.Serie  := Leitor.rCampo(tcStr, 'Serie');
+        InfRec.FMsgRetorno[i].FIdentificacaoRps.Tipo   := StrToTipoRPS(Ok, Leitor.rCampo(tcStr, 'Tipo'));
+
+        InfRec.FMsgRetorno[i].FCodigo   := Leitor.rCampo(tcStr, 'Codigo');
+        InfRec.FMsgRetorno[i].FMensagem := Leitor.rCampo(tcStr, 'Mensagem');
+        InfRec.FMsgRetorno[i].FCorrecao := Leitor.rCampo(tcStr, 'Correcao');
+      end;
+    end;
+
     if Provedor in [proElotech] then
     begin
       i := 0;
@@ -430,6 +446,19 @@ begin
       InfRec.FMsgRetorno[i].FCorrecao := Leitor.rCampo(tcStr, 'ErroSolucao');
 
       inc(i);
+    end;
+
+    if (Provedor in [proAEG]) and (Pos('ResultadoErro', Leitor.Arquivo) > 0) then
+    begin
+      while Leitor.rExtrai(iNivel, 'Resultado', '', i + 1) <> '' do
+      begin
+        InfRec.FMsgRetorno.New;
+        InfRec.FMsgRetorno[i].FCodigo   := Leitor.rCampo(tcStr, 'ResultadoCodigo');
+        InfRec.FMsgRetorno[i].FMensagem := Leitor.rCampo(tcStr, 'ResultadoErro');
+        InfRec.FMsgRetorno[i].FCorrecao := '';
+
+        inc(i);
+      end;
     end;
   except
     Result := False;
@@ -923,7 +952,7 @@ begin
         while Leitor.rExtrai(2, 'DesOco', '', j + 1) <> '' do
         begin
           Msg  := Leitor.rCampo(tcStr, 'DesOco');
-          if (Pos('OK!', Msg) = 0) and (Pos('importado com sucesso', Msg) = 0) then
+          if (Pos('OK!', Msg) = 0) and (Pos('Importado com sucesso', Msg) = 0) then
           begin
             InfRec.FMsgRetorno.New;
             InfRec.FMsgRetorno[MsgErro].FMensagem := Msg;
@@ -1393,7 +1422,7 @@ begin
 
              while leitorAux.rExtrai(1, 'DescricaoErros', '', i + 1) <> '' do
               begin
-                FInfRec.MsgRetorno.Add;
+                FInfRec.MsgRetorno.New;
                 FInfRec.FMsgRetorno[i].FCodigo   := leitorAux.rCampo(tcStr, 'id');
                 FInfRec.FMsgRetorno[i].FMensagem := leitorAux.rCampo(tcStr, 'DescricaoProcesso');
 
@@ -1408,7 +1437,7 @@ begin
 
              while Leitor.rExtrai(1, 'DescricaoErros', '', i + 1) <> '' do
               begin
-                FInfRec.MsgRetorno.Add;
+                FInfRec.MsgRetorno.New;
                 FInfRec.FMsgRetorno[i].FCodigo   := leitorAux.rCampo(tcStr, 'id');
                 FInfRec.FMsgRetorno[i].FMensagem := leitorAux.rCampo(tcStr, 'DescricaoErro');
 

@@ -55,7 +55,7 @@ const
   CConta = 'CONTA';
   CTitulo = 'TITULO';
 
-  cACBrTipoOcorrenciaDecricao: array[0..296] of String = (
+  cACBrTipoOcorrenciaDecricao: array[0..305] of String = (
     'Remessa Registrar',
     'Remessa Baixar',
     'Remessa Debitar Em Conta',
@@ -130,7 +130,9 @@ const
     'Remessa Pedido de negativação',
     'Remessa Excluir negativação e baixar',
     'Remessa Excluir negativação e manter em carteira',	
-	
+    'Remessa Protestar Automaticamente',
+    'Remessa Alteração de Status Desconto',
+
     'Retorno Abatimento Cancelado',
     'Retorno Abatimento Concedido',
     'Retorno Acerto Controle Participante',
@@ -353,7 +355,14 @@ const
     'Retorno Ocorrência Informacional por Outros Motivos',
     'Retorno Inclusão de Negativação',
     'Retorno Exclusão de Negativação',
-    'Retorno Em Transito'
+    'Retorno Em Transito',
+    'Retorno Liquidação em Condicional em Cartório Com Cheque do Próprio Devedor',
+    'Retorno Título Protestado Sustado Judicialmente em definitivo',
+    'Retorno Liquidação de Título Descontado',
+    'Retorno Protesto Em Cartório',
+    'Retorno Sustação Solicitada',
+    'Retorno Título Utilizado Como Garantia em Operação de Desconto',
+    'Retorno Título Descontável Com Desistência de Garantia em Operação de Desconto'
 );
 
 type
@@ -498,7 +507,9 @@ type
     toRemessaSustarProtestoBaixarTitulo,
     toRemessaSustarProtestoManterCarteira,
     toRemessaRecusaAlegacaoSacado,
-	
+    toRemessaProtestoAutomatico,
+    toRemessaAlterarStatusDesconto,
+
     {Ocorrências para arquivo retorno}
     toRetornoAbatimentoCancelado,
     toRetornoAbatimentoConcedido,
@@ -722,7 +733,14 @@ type
     toRetornoOcorrenciaInfOutrosMotivos,
     toRetornoInclusaoNegativacao,
     toRetornoExclusaoNegativacao,
-    toRetornoEmTransito
+    toRetornoEmTransito,
+    toRetornoLiquidadoEmCartorioEmCondicionalComChequeDoDevedor,
+    toRetornoProtestoSustadoDefinitivo,
+    toRetornoLiquidadoTituloDescontado,
+    toRetornoProtestadoEmCartorio,
+    toRetornoSustacaoSolicitada,
+    toRetornoTituloDescontado,
+    toRetornoTituloDescontavel
   );
 
   //Complemento de instrução para alterar outros dados
@@ -1264,6 +1282,7 @@ type
   end;
 
   { TListadeNFes }
+
   TACBrListadeNFes = class(TObjectList)
   protected
     procedure SetObject (Index: Integer; Item: TACBrDadosNFe);
@@ -1274,7 +1293,6 @@ type
     property Objects [Index: Integer]: TACBrDadosNFe
       read GetObject write SetObject; default;
   end;
-
 
   { TACBrTitulo }
 
@@ -1359,8 +1377,8 @@ type
 
     fCodigoGeracao        : String;
     fValorPago            : Currency;
-    fCaracTitulo          :TACBrCaracTitulo;
-	fListaDadosNFe        : TACBrListadeNFes;
+    fCaracTitulo          : TACBrCaracTitulo;
+    fListaDadosNFe        : TACBrListadeNFes;
     fTipoPagamento: TTipo_Pagamento;
     fQtdePagamentoParcial: Integer;
     fQtdeParcelas: Integer;
@@ -1741,7 +1759,6 @@ begin
    Result := inherited Add(Obj) ;
 end;
 
-
 {$IFNDEF FPC}
    {$R ACBrBoleto.dcr}
 {$ENDIF}
@@ -1919,6 +1936,7 @@ begin
    fCNPJCPF       := '';
    fDigitoVerificadorAgenciaConta:= '';
    fResponEmissao := tbCliEmite;
+   fIdentDistribuicao := tbClienteDistribui;
    fCaracTitulo   := tcSimples;
    fTipoInscricao := pJuridica;
    fAcbrBoleto    := TACBrBoleto(AOwner);
@@ -4040,7 +4058,6 @@ begin
      else
         Result := '0';
      end;
-
   end;
 end;
 
@@ -4713,6 +4730,7 @@ begin
         CEP           := IniBoletos.ReadString(CCedente,'CEP',CEP);
         Complemento   := IniBoletos.ReadString(CCedente,'Complemento',Complemento);
         UF            := IniBoletos.ReadString(CCedente,'UF',UF);
+        Telefone      := IniBoletos.ReadString(CCedente,'Telefone',Telefone);
         CodigoCedente := IniBoletos.ReadString(CCedente,'CodigoCedente',CodigoCedente);
         Modalidade    := IniBoletos.ReadString(CCedente,'MODALIDADE',Modalidade);
         CodigoTransmissao:= IniBoletos.ReadString(CCedente,'CODTRANSMISSAO',CodigoTransmissao);
@@ -5230,11 +5248,14 @@ end;
 
 function TACBrBoletoFCClass.GetNomeArquivoPdfIndividual(const ANomeArquivo: String;
          const AIndex: Integer): String;
+var
+  lNumDocumento: String;
 begin
+  lNumDocumento := OnlyNumber(ACBrBoleto.ListadeBoletos[AIndex].NumeroDocumento);
   if ANomeArquivo = '' then
-    Result := PathWithDelim( ApplicationPath ) + ChangeFileExt(ACBrBoleto.ListadeBoletos[AIndex].NumeroDocumento, '.pdf')
+    Result := PathWithDelim( ApplicationPath ) + ChangeFileExt(lNumDocumento, '.pdf')
   else
-    Result := ChangeFileExt( ChangeFileExt(ANomeArquivo,'') + '_' + ACBrBoleto.ListadeBoletos[AIndex].NumeroDocumento, '.pdf');
+    Result := ChangeFileExt( ChangeFileExt(ANomeArquivo,'') + '_' + lNumDocumento, '.pdf');
 end;
 
 procedure TACBrBoletoFCClass.SetNumCopias ( AValue: Integer ) ;

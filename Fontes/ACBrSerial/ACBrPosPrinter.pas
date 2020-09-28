@@ -106,6 +106,7 @@ type
     FZera: AnsiString;
   public
     constructor Create;
+    procedure Clear;
 
     property Zera: AnsiString read FZera write FZera;
     property EspacoEntreLinhas: AnsiString read FEspacoEntreLinhas
@@ -180,7 +181,8 @@ type
 
   TACBrPosPrinterModelo = (ppTexto, ppEscPosEpson, ppEscBematech, ppEscDaruma,
                            ppEscVox, ppEscDiebold, ppEscEpsonP2, ppCustomPos,
-                           ppEscPosStar, ppEscZJiang, ppEscGPrinter, ppEscDatecs);
+                           ppEscPosStar, ppEscZJiang, ppEscGPrinter, ppEscDatecs,
+                           ppExterno);
 
   { TACBrPosPrinterClass }
 
@@ -195,7 +197,13 @@ type
     fpPosPrinter: TACBrPosPrinter;
 
   public
-    function TraduzirTagBloco(const ATag, ConteudoBloco: AnsiString): AnsiString; virtual;
+    procedure AntesDecodificar(var ABinaryString: AnsiString); virtual;
+    procedure AdicionarBlocoResposta(const ConteudoBloco: AnsiString); virtual;
+    procedure DepoisDecodificar(var ABinaryString: AnsiString); virtual;
+    function TraduzirTag(const ATag: AnsiString; var TagTraduzida: AnsiString): Boolean; virtual;
+    function TraduzirTagBloco(const ATag, ConteudoBloco: AnsiString;
+      var BlocoTraduzido: AnsiString): Boolean; virtual;
+
     function ComandoCodBarras(const ATag: String; const ACodigo: AnsiString): AnsiString; virtual;
     function ComandoQrCode(const ACodigo: AnsiString): AnsiString; virtual;
     function ComandoEspacoEntreLinhas(Espacos: byte): AnsiString; virtual;
@@ -410,6 +418,7 @@ type
     FEspacoEntreLinhas: Byte;
     FConfigGaveta: TACBrConfigGaveta;
     FModelo: TACBrPosPrinterModelo;
+    FModeloExterno: TACBrPosPrinterClass;
     FOnAguardarCheque: TACBrPosOnAguardarCheque;
     FCancelarEsperaCheque: Boolean;
     FOnGravarLog: TACBrGravarLog;
@@ -458,6 +467,7 @@ type
     procedure SetPorta(const AValue: String);
     procedure SetTraduzirTags(AValue: Boolean);
     procedure SetModelo(AValue: TACBrPosPrinterModelo);
+    procedure SetModeloExterno(APosPrinterClass: TACBrPosPrinterClass);
     procedure VerificarParametrosLogo(const AKC2: Integer = -1; const AKC1: Integer = -1);
     function ProcessarComandoBMP(const ConteudoBloco: String): AnsiString;
     function ProcessarPosicionaXY(const ConteudoBloco: String): AnsiString;
@@ -465,13 +475,17 @@ type
 
   protected
     FPosPrinterClass: TACBrPosPrinterClass;
+
     {$IfDef MSWINDOWS}
      FHook: TACBrPosPrinterHook;
     {$EndIf}
 
     procedure EnviarStringDevice(AString: AnsiString);
-    procedure TraduzirTag(const ATag: AnsiString; var TagTraduzida: AnsiString);
-    procedure TraduzirTagBloco(const ATag, ConteudoBloco: AnsiString;
+
+    function DecodificarTagsFormatacao(ABinaryString: AnsiString): AnsiString;
+    procedure DoTraduzirTag(const ATag: AnsiString; var TagTraduzida: AnsiString);
+    procedure DoAdicionarBlocoResposta(const ConteudoBloco: AnsiString);
+    procedure DoTraduzirTagBloco(const ATag, ConteudoBloco: AnsiString;
       var BlocoTraduzido: AnsiString);
 
     procedure AtivarPorta;
@@ -519,6 +533,8 @@ type
     function TxRx(const ACmd: AnsiString; BytesToRead: Byte = 1;
       ATimeOut: Integer = 500; WaitForTerminator: Boolean = False): AnsiString;
 
+    property TagProcessor: TACBrTagProcessor read FTagProcessor;
+    property TagsNaoSuportadas: TStringList read GetTagsNaoSuportadas;
     procedure RetornarTags(AStringList: TStrings; IncluiAjuda: Boolean = True);
     procedure ImprimirTags;
 
@@ -561,8 +577,6 @@ type
     property Inicializada: Boolean read FInicializada;
     property ModoPagina: Boolean read FModoPaginaLigado;
 
-    property TagsNaoSuportadas: TStringList read GetTagsNaoSuportadas;
-
     function PodeLerDaPorta: Boolean;
     property TemGuilhotina: Integer read GetTemGuilhotina;
     property TemCheque: Integer read GetTemCheque;
@@ -570,6 +584,7 @@ type
     property TemMICR: Integer read GetTemMICR;
     property LeituraCheque: AnsiString read GetLeituraCheque;
 
+    property ModeloExterno: TACBrPosPrinterClass read FModeloExterno write SetModeloExterno;
   published
     property Modelo: TACBrPosPrinterModelo read FModelo write SetModelo default ppTexto;
     property Porta: String read GetPorta write SetPorta;
@@ -891,6 +906,11 @@ end;
 constructor TACBrPosComandos.Create;
 begin
   inherited;
+  Clear;
+end;
+
+procedure TACBrPosComandos.Clear;
+begin
   FPuloDeLinha := LF;
   FPuloDePagina := FF;
   FBeep := '';
@@ -976,6 +996,8 @@ end;
 
 constructor TACBrPosRazaoColunaFonte.Create;
 begin
+  inherited Create;
+
   FCondensada := 0.75;
   FExpandida := 2;
 end;
@@ -1003,10 +1025,32 @@ begin
   inherited;
 end;
 
-function TACBrPosPrinterClass.TraduzirTagBloco(
-  const ATag, ConteudoBloco: AnsiString): AnsiString;
+procedure TACBrPosPrinterClass.AntesDecodificar(var ABinaryString: AnsiString);
 begin
-  Result := ConteudoBloco;
+  { não altera ABinaryString aqui, sobreescrever se necessário }
+end;
+
+procedure TACBrPosPrinterClass.AdicionarBlocoResposta(
+  const ConteudoBloco: AnsiString);
+begin
+  { não faz nada aqui, sobreescrever se necessário }
+end;
+
+procedure TACBrPosPrinterClass.DepoisDecodificar(var ABinaryString: AnsiString);
+begin
+  { não altera ABinaryString aqui, sobreescrever se necessário }
+end;
+
+function TACBrPosPrinterClass.TraduzirTag(const ATag: AnsiString;
+  var TagTraduzida: AnsiString): Boolean;
+begin
+  Result := False;  // Não traduziu aqui, sobreescrever se necessário;
+end;
+
+function TACBrPosPrinterClass.TraduzirTagBloco(const ATag,
+  ConteudoBloco: AnsiString; var BlocoTraduzido: AnsiString): Boolean;
+begin
+  Result := False;  // Não traduziu aqui, sobreescrever se necessário
 end;
 
 function TACBrPosPrinterClass.ComandoCodBarras(const ATag: String;
@@ -1017,7 +1061,7 @@ end;
 
 function TACBrPosPrinterClass.ComandoQrCode(const ACodigo: AnsiString): AnsiString;
 begin
-  Result := '';
+  Result := ACodigo;
 end;
 
 function TACBrPosPrinterClass.ComandoEspacoEntreLinhas(Espacos: byte): AnsiString;
@@ -1234,7 +1278,7 @@ end;
 
 procedure TACBrPosPrinterClass.Configurar;
 begin
-  {nada aqui, método virtual}
+  fpPosPrinter.OnEnviarStringDevice := Nil;
 end;
 
 procedure TACBrPosPrinterClass.LerStatus(var AStatus: TACBrPosPrinterStatus);
@@ -1285,6 +1329,8 @@ begin
   {$EndIf}
 
   FPosPrinterClass := TACBrPosPrinterClass.Create(Self);
+  FPosPrinterClass.RazaoColunaFonte.Condensada := 1;
+  FPosPrinterClass.RazaoColunaFonte.Expandida := 1;
   FModelo := ppTexto;
 
   FTipoAlinhamento := alEsquerda;
@@ -1478,8 +1524,9 @@ begin
     EhBloco := True;
   end;
 
-  FTagProcessor.OnTraduzirTag := TraduzirTag;
-  FTagProcessor.OnTraduzirTagBloco := TraduzirTagBloco;
+  FTagProcessor.OnTraduzirTag := DoTraduzirTag;
+  FTagProcessor.OnAdicionarBlocoResposta := DoAdicionarBlocoResposta;
+  FTagProcessor.OnTraduzirTagBloco := DoTraduzirTagBloco;
 
   FBuffer := TStringList.Create;
   FBuffer.OnChange := DoLinesChange;
@@ -1505,7 +1552,8 @@ begin
   {$IfDef MSWINDOWS}
   LiberarHook;
   {$EndIf}
-  FPosPrinterClass.Free;
+  if (FPosPrinterClass <> FModeloExterno) then
+    FPosPrinterClass.Free;
   FBuffer.Free;
   FPosCheques.Free;
   FTagProcessor.Free;
@@ -1607,7 +1655,11 @@ begin
   GravarLog('SetModelo(' + AnsiString(GetEnumName(TypeInfo(TACBrPosPrinterModelo),
     integer(AValue))) + ')');
 
-  FPosPrinterClass.Free;
+  if (AValue = ppExterno) and (not Assigned(FModeloExterno)) then
+    raise EPosPrinterException.Create(ACBrStr('Nenhum Modelo Externo atribuído'));
+
+  if (FPosPrinterClass <> FModeloExterno) then
+    FPosPrinterClass.Free;
 
   case AValue of
     ppEscPosEpson: FPosPrinterClass := TACBrEscPosEpson.Create(Self);
@@ -1621,11 +1673,37 @@ begin
     ppEscZJiang: FPosPrinterClass := TACBrEscZJiang.Create(Self);
     ppEscGPrinter: FPosPrinterClass := TACBrEscGPrinter.Create(Self);
     ppEscDatecs: FPosPrinterClass := TACBrEscDatecs.Create(Self);
+    ppExterno: FPosPrinterClass := FModeloExterno;
   else
     FPosPrinterClass := TACBrPosPrinterClass.Create(Self);
+    FPosPrinterClass.RazaoColunaFonte.Condensada := 1;
+    FPosPrinterClass.RazaoColunaFonte.Expandida := 1;
   end;
 
   FModelo := AValue;
+end;
+
+procedure TACBrPosPrinter.SetModeloExterno(
+  APosPrinterClass: TACBrPosPrinterClass);
+begin
+  if (FModeloExterno = APosPrinterClass) then
+    Exit;
+
+  GravarLog('SetModeloExterno()');
+
+  if Assigned(APosPrinterClass) then
+  begin
+    if (FPosPrinterClass <> FModeloExterno) then
+      FPosPrinterClass.Free;
+
+    FModeloExterno := APosPrinterClass;
+    FPosPrinterClass := APosPrinterClass;
+    FModelo := ppExterno;
+
+    FModeloExterno.Configurar;
+  end
+  else
+    Modelo := ppTexto;
 end;
 
 procedure TACBrPosPrinter.VerificarParametrosLogo(const AKC2: Integer;
@@ -1771,7 +1849,7 @@ begin
   RelPos.y := trunc(max(ADimensao.y-APos.y,1) * 6.2);
 
   Result := FPosPrinterClass.ComandoPosicionaModoPagina(RelPos) +
-            FTagProcessor.DecodificarTagsFormatacao( CodificarPaginaDeCodigo(AText) ) +
+            DecodificarTagsFormatacao( CodificarPaginaDeCodigo(AText) ) +
             FPosPrinterClass.Cmd.PuloDeLinha;
 end;
 
@@ -1786,11 +1864,13 @@ begin
   Result := FPosPrinterClass.LeituraCheque;
 end;
 
-
-procedure TACBrPosPrinter.TraduzirTag(const ATag: AnsiString;
+procedure TACBrPosPrinter.DoTraduzirTag(const ATag: AnsiString;
   var TagTraduzida: AnsiString);
 begin
   // GravarLog(AnsiString('TraduzirTag(' + ATag + ')'));   // DEBUG - permite medir de tradução de cada Tag
+  TagTraduzida := '';
+  if FPosPrinterClass.TraduzirTag(ATag, TagTraduzida) then
+    Exit;
 
   TagTraduzida := '';
 
@@ -1870,7 +1950,7 @@ begin
   begin
     TagTraduzida := FPosPrinterClass.Cmd.FonteNormal;
     FFonteStatus := FFonteStatus - [ftCondensado, ftExpandido, ftAlturaDupla,
-                                    ftNegrito, ftSublinhado, ftItalico, ftInvertido];
+                                    ftNegrito, ftSublinhado, ftItalico, ftInvertido, ftFonteB];
   end
 
   else if ATag = cTagZera then
@@ -2003,210 +2083,214 @@ begin
   GravarLog(AnsiString('TraduzirTag(' + ATag + ') -> ') + TagTraduzida, True);
 end;
 
-procedure TACBrPosPrinter.TraduzirTagBloco(const ATag, ConteudoBloco: AnsiString;
+procedure TACBrPosPrinter.DoAdicionarBlocoResposta(
+  const ConteudoBloco: AnsiString);
+begin
+  FPosPrinterClass.AdicionarBlocoResposta(ConteudoBloco);
+end;
+
+procedure TACBrPosPrinter.DoTraduzirTagBloco(const ATag, ConteudoBloco: AnsiString;
   var BlocoTraduzido: AnsiString);
 var
   ACodBar: AnsiString;
 begin
-  BlocoTraduzido := FPosPrinterClass.TraduzirTagBloco(ATag, ConteudoBloco);
+  BlocoTraduzido := ConteudoBloco;
+  if FPosPrinterClass.TraduzirTagBloco(ATag, ConteudoBloco, BlocoTraduzido) then
+    Exit;
 
-  if ConteudoBloco = BlocoTraduzido then  // Não traduziu...
+  if ATag = cTagAlinhadoEsquerda then
+    BlocoTraduzido := PadRightA(ConteudoBloco, Colunas)
+
+  else if ATag = cTagAlinhadoDireita then
+    BlocoTraduzido := PadLeftA(ConteudoBloco, Colunas)
+
+  else if ATag = cTagAlinhadoCentro then
+    BlocoTraduzido := PadCenterA(ConteudoBloco, Colunas)
+
+  else if ATag = cTagAbreGavetaEsp then
+    BlocoTraduzido := FPosPrinterClass.ComandoGaveta( StrToIntDef( ConteudoBloco, 1) )
+
+  else if ATag = cTagQRCodeTipo then
   begin
-    if ATag = cTagAlinhadoEsquerda then
-      BlocoTraduzido := PadRightA(ConteudoBloco, Colunas)
+    BlocoTraduzido := '';
+    ConfigQRCode.Tipo := StrToIntDef( ConteudoBloco, ConfigQRCode.Tipo);
+  end
 
-    else if ATag = cTagAlinhadoDireita then
-      BlocoTraduzido := PadLeftA(ConteudoBloco, Colunas)
+  else if ATag = cTagQRCodeLargura then
+  begin
+    BlocoTraduzido := '';
+    ConfigQRCode.LarguraModulo := StrToIntDef( ConteudoBloco, ConfigQRCode.LarguraModulo);
+  end
 
-    else if ATag = cTagAlinhadoCentro then
-      BlocoTraduzido := PadCenterA(ConteudoBloco, Colunas)
+  else if ATag = cTagQRCodeError then
+  begin
+    BlocoTraduzido := '';
+    ConfigQRCode.ErrorLevel := StrToIntDef( ConteudoBloco, ConfigQRCode.ErrorLevel);
+  end
 
-    else if ATag = cTagAbreGavetaEsp then
-      BlocoTraduzido := FPosPrinterClass.ComandoGaveta( StrToIntDef( ConteudoBloco, 1) )
+  else if ATag = cTagQRCode then
+  begin
+    BlocoTraduzido := FPosPrinterClass.ComandoQrCode(ConteudoBloco);
+  end
 
-    else if ATag = cTagQRCodeTipo then
+  else if ATag = cTagBMP then
+  begin
+    BlocoTraduzido := ProcessarComandoBMP(ConteudoBloco);
+  end
+
+  else if ATag = cTagModoPaginaDirecao then
+  begin
+    BlocoTraduzido := '';
+    ConfigModoPagina.Direcao := TACBrPosDirecao(StrToIntDef(ConteudoBloco, 0));
+  end
+
+  else if ATag = cTagModoPaginaPosEsquerda then
+  begin
+    BlocoTraduzido := '';
+    ConfigModoPagina.Esquerda := StrToIntDef(ConteudoBloco, ConfigModoPagina.Esquerda);
+  end
+
+  else if ATag = cTagModoPaginaPosTopo then
+  begin
+    BlocoTraduzido := '';
+    ConfigModoPagina.Topo := StrToIntDef(ConteudoBloco, ConfigModoPagina.Topo);
+  end
+
+  else if ATag = cTagModoPaginaAltura then
+  begin
+    BlocoTraduzido := '';
+    ConfigModoPagina.Altura := StrToIntDef(ConteudoBloco, ConfigModoPagina.Altura);
+  end
+
+  else if ATag = cTagModoPaginaEspaco then
+  begin
+    BlocoTraduzido := '';
+    ConfigModoPagina.EspacoEntreLinhas := StrToIntDef(ConteudoBloco, ConfigModoPagina.EspacoEntreLinhas);
+  end
+
+  else if ATag = cTagModoPaginaLargura then
+  begin
+    BlocoTraduzido := '';
+    ConfigModoPagina.Largura := StrToIntDef(ConteudoBloco, ConfigModoPagina.Largura);
+  end
+
+  else if ATag = cTagModoPaginaPosiciona then
+  begin
+    BlocoTraduzido := ProcessarPosicionaXY(ConteudoBloco);
+  end
+
+  else if ATag = cTagBarraMostrar then
+  begin
+    BlocoTraduzido := '';
+    ConfigBarras.MostrarCodigo := StrToBoolDef( ConteudoBloco, ConfigBarras.MostrarCodigo);
+  end
+
+  else if ATag = cTagBarraLargura then
+  begin
+    BlocoTraduzido := '';
+    ConfigBarras.LarguraLinha := StrToIntDef( ConteudoBloco, ConfigBarras.LarguraLinha);
+  end
+
+  else if ATag = cTagBarraAltura then
+  begin
+    BlocoTraduzido := '';
+    ConfigBarras.Altura := StrToIntDef( ConteudoBloco, ConfigBarras.Altura);
+  end
+
+  else if ATag = cTagLogoImprimir then
+  begin
+    BlocoTraduzido := '';
+    ConfigLogo.IgnorarLogo := not StrToBoolDef( ConteudoBloco, not ConfigLogo.IgnorarLogo);
+  end
+
+  else if ATag = cTagLogoKC1 then
+  begin
+    BlocoTraduzido := '';
+    ConfigLogo.KeyCode1 := StrToIntDef( ConteudoBloco, ConfigLogo.KeyCode1);
+  end
+
+  else if ATag = cTagLogoKC2 then
+  begin
+    BlocoTraduzido := '';
+    ConfigLogo.KeyCode2 := StrToIntDef( ConteudoBloco, ConfigLogo.KeyCode2);
+  end
+
+  else if ATag = cTagLogoFatorX then
+  begin
+    BlocoTraduzido := '';
+    ConfigLogo.FatorX := StrToIntDef( ConteudoBloco, ConfigLogo.FatorX);
+  end
+
+  else if ATag = cTagLogoFatorY then
+  begin
+    BlocoTraduzido := '';
+    ConfigLogo.FatorY := StrToIntDef( ConteudoBloco, ConfigLogo.FatorY);
+  end
+
+  else if (AnsiIndexText(ATag, cTAGS_BARRAS) >= 0) then
+  begin
+    // Ajustando os Códigos de Barras, conforme regras do Tipo do Código //
+    if (ATag = cTagBarraUPCA) then
+      // Apenas números, sempre 11 digitos, e 1 digito verificador
+      ACodBar := PadLeftA(OnlyNumber(ConteudoBloco), 11, '0')
+
+    else if (ATag = cTagBarraUPCE) then
+      // EPC-A compactado, Apenas números, 6 ou 11 dígitos
+      ACodBar := OnlyNumber(ConteudoBloco)
+
+    else if ATag = cTagBarraEAN13 then
+      // Apenas números, sempre 12 digitos, e 1 digito verificador
+      ACodBar := PadLeftA(OnlyNumber(ConteudoBloco), 12, '0')
+
+    else if ATag = cTagBarraEAN8 then
+      // Apenas números, sempre 7 digitos, e 1 digito verificador
+      ACodBar := PadLeftA(OnlyNumber(ConteudoBloco), 7, '0')
+
+    else if ATag = cTagBarraCode128c then
+      // Apenas números,
+      ACodBar := AnsiString(OnlyNumber(ConteudoBloco))
+
+    else if ATag = cTagBarraCode39 then
+      // Qualquer tamanho.. Aceita: 0~9, A~Z, ' ', '$', '%', '*', '+', '-', '.', '/'
+      ACodBar := AnsiString(OnlyCharsInSet(ConteudoBloco,
+        ['0'..'9', 'A'..'Z', ' ', '$', '%', '*', '+', '-', '.', '/']))
+
+    else if ATag = cTagBarraCode93 then
+      // Qualquer tamanho.. Aceita: #0~#127
+      ACodBar := AnsiString(OnlyCharsInSet(ConteudoBloco, [#0..#127]))
+
+    else if ATag = cTagBarraInter then
     begin
-      BlocoTraduzido := '';
-      ConfigQRCode.Tipo := StrToIntDef( ConteudoBloco, ConfigQRCode.Tipo);
+      // Interleaved 2of5. Somente números, Tamanho deve ser PAR
+      ACodBar := AnsiString(OnlyNumber(ConteudoBloco));
+
+      if (Length(ACodBar) mod 2) <> 0 then  // Tamanho é Par ?
+        ACodBar := '0' + ACodBar;
     end
 
-    else if ATag = cTagQRCodeLargura then
-    begin
-      BlocoTraduzido := '';
-      ConfigQRCode.LarguraModulo := StrToIntDef( ConteudoBloco, ConfigQRCode.LarguraModulo);
-    end
+    else if ATag = cTagBarraStd then
+      // Apenas números, Sem dígito verificador
+      ACodBar := AnsiString(OnlyNumber(ConteudoBloco))
 
-    else if ATag = cTagQRCodeError then
-    begin
-      BlocoTraduzido := '';
-      ConfigQRCode.ErrorLevel := StrToIntDef( ConteudoBloco, ConfigQRCode.ErrorLevel);
-    end
+    else if ATag = cTagBarraCodaBar then
+      // Qualquer tamanho.. Aceita: 0~9, A~D, a~d, $, +, -, ., /, :
+      ACodBar := AnsiString(OnlyCharsInSet(ConteudoBloco,
+        ['0'..'9', 'A'..'D', 'a'..'d', '$', '+', '-', '.', '/', ':']))
 
-    else if ATag = cTagQRCode then
-    begin
-      BlocoTraduzido := FPosPrinterClass.ComandoQrCode(ConteudoBloco);
-    end
+    else if ATag = cTagBarraCode11 then
+      // Apenas números, Qualquer tamanho, dois dígitos verificador
+      ACodBar := AnsiString(OnlyNumber(ConteudoBloco))
 
-    else if ATag = cTagBMP then
-    begin
-      BlocoTraduzido := ProcessarComandoBMP(ConteudoBloco);
-    end
+    else if ATag = cTagBarraMSI then
+      // Apenas números, 1 dígito verificador
+      ACodBar := AnsiString(OnlyNumber(ConteudoBloco))
 
-    else if ATag = cTagModoPaginaDirecao then
-    begin
-      BlocoTraduzido := '';
-      ConfigModoPagina.Direcao := TACBrPosDirecao(StrToIntDef(ConteudoBloco, 0));
-    end
+    else
+      ACodBar := ConteudoBloco;
 
-    else if ATag = cTagModoPaginaPosEsquerda then
-    begin
-      BlocoTraduzido := '';
-      ConfigModoPagina.Esquerda := StrToIntDef(ConteudoBloco, ConfigModoPagina.Esquerda);
-    end
+    ACodBar:= LeftStr(ACodBar, 255);  // Tamanho máximo para Cod.Barras é 255 caracteres
 
-    else if ATag = cTagModoPaginaPosTopo then
-    begin
-      BlocoTraduzido := '';
-      ConfigModoPagina.Topo := StrToIntDef(ConteudoBloco, ConfigModoPagina.Topo);
-    end
-
-    else if ATag = cTagModoPaginaAltura then
-    begin
-      BlocoTraduzido := '';
-      ConfigModoPagina.Altura := StrToIntDef(ConteudoBloco, ConfigModoPagina.Altura);
-    end
-
-    else if ATag = cTagModoPaginaEspaco then
-    begin
-      BlocoTraduzido := '';
-      ConfigModoPagina.EspacoEntreLinhas := StrToIntDef(ConteudoBloco, ConfigModoPagina.EspacoEntreLinhas);
-    end
-
-    else if ATag = cTagModoPaginaLargura then
-    begin
-      BlocoTraduzido := '';
-      ConfigModoPagina.Largura := StrToIntDef(ConteudoBloco, ConfigModoPagina.Largura);
-    end
-
-    else if ATag = cTagModoPaginaPosiciona then
-    begin
-      BlocoTraduzido := ProcessarPosicionaXY(ConteudoBloco);
-    end
-
-    else if ATag = cTagBarraMostrar then
-    begin
-      BlocoTraduzido := '';
-      ConfigBarras.MostrarCodigo := StrToBoolDef( ConteudoBloco, ConfigBarras.MostrarCodigo);
-    end
-
-    else if ATag = cTagBarraLargura then
-    begin
-      BlocoTraduzido := '';
-      ConfigBarras.LarguraLinha := StrToIntDef( ConteudoBloco, ConfigBarras.LarguraLinha);
-    end
-
-    else if ATag = cTagBarraAltura then
-    begin
-      BlocoTraduzido := '';
-      ConfigBarras.Altura := StrToIntDef( ConteudoBloco, ConfigBarras.Altura);
-    end
-
-    else if ATag = cTagLogoImprimir then
-    begin
-      BlocoTraduzido := '';
-      ConfigLogo.IgnorarLogo := not StrToBoolDef( ConteudoBloco, not ConfigLogo.IgnorarLogo);
-    end
-
-    else if ATag = cTagLogoKC1 then
-    begin
-      BlocoTraduzido := '';
-      ConfigLogo.KeyCode1 := StrToIntDef( ConteudoBloco, ConfigLogo.KeyCode1);
-    end
-
-    else if ATag = cTagLogoKC2 then
-    begin
-      BlocoTraduzido := '';
-      ConfigLogo.KeyCode2 := StrToIntDef( ConteudoBloco, ConfigLogo.KeyCode2);
-    end
-
-    else if ATag = cTagLogoFatorX then
-    begin
-      BlocoTraduzido := '';
-      ConfigLogo.FatorX := StrToIntDef( ConteudoBloco, ConfigLogo.FatorX);
-    end
-
-    else if ATag = cTagLogoFatorY then
-    begin
-      BlocoTraduzido := '';
-      ConfigLogo.FatorY := StrToIntDef( ConteudoBloco, ConfigLogo.FatorY);
-    end
-
-    else if (AnsiIndexText(ATag, cTAGS_BARRAS) >= 0) then
-    begin
-
-      // Ajustando os Códigos de Barras, conforme regras do Tipo do Código //
-      if (ATag = cTagBarraUPCA) then
-        // Apenas números, sempre 11 digitos, e 1 digito verificador
-        ACodBar := PadLeftA(OnlyNumber(ConteudoBloco), 11, '0')
-
-      else if (ATag = cTagBarraUPCE) then
-        // EPC-A compactado, Apenas números, 6 ou 11 dígitos
-        ACodBar := OnlyNumber(ConteudoBloco)
-
-      else if ATag = cTagBarraEAN13 then
-        // Apenas números, sempre 12 digitos, e 1 digito verificador
-        ACodBar := PadLeftA(OnlyNumber(ConteudoBloco), 12, '0')
-
-      else if ATag = cTagBarraEAN8 then
-        // Apenas números, sempre 7 digitos, e 1 digito verificador
-        ACodBar := PadLeftA(OnlyNumber(ConteudoBloco), 7, '0')
-
-      else if ATag = cTagBarraCode128c then
-        // Apenas números,
-        ACodBar := AnsiString(OnlyNumber(ConteudoBloco))
-
-      else if ATag = cTagBarraCode39 then
-        // Qualquer tamanho.. Aceita: 0~9, A~Z, ' ', '$', '%', '*', '+', '-', '.', '/'
-        ACodBar := AnsiString(OnlyCharsInSet(ConteudoBloco,
-          ['0'..'9', 'A'..'Z', ' ', '$', '%', '*', '+', '-', '.', '/']))
-
-      else if ATag = cTagBarraCode93 then
-        // Qualquer tamanho.. Aceita: #0~#127
-        ACodBar := AnsiString(OnlyCharsInSet(ConteudoBloco, [#0..#127]))
-
-      else if ATag = cTagBarraInter then
-      begin
-        // Interleaved 2of5. Somente números, Tamanho deve ser PAR
-        ACodBar := AnsiString(OnlyNumber(ConteudoBloco));
-
-        if (Length(ACodBar) mod 2) <> 0 then  // Tamanho é Par ?
-          ACodBar := '0' + ACodBar;
-      end
-
-      else if ATag = cTagBarraStd then
-        // Apenas números, Sem dígito verificador
-        ACodBar := AnsiString(OnlyNumber(ConteudoBloco))
-
-      else if ATag = cTagBarraCodaBar then
-        // Qualquer tamanho.. Aceita: 0~9, A~D, a~d, $, +, -, ., /, :
-        ACodBar := AnsiString(OnlyCharsInSet(ConteudoBloco,
-          ['0'..'9', 'A'..'D', 'a'..'d', '$', '+', '-', '.', '/', ':']))
-
-      else if ATag = cTagBarraCode11 then
-        // Apenas números, Qualquer tamanho, dois dígitos verificador
-        ACodBar := AnsiString(OnlyNumber(ConteudoBloco))
-
-      else if ATag = cTagBarraMSI then
-        // Apenas números, 1 dígito verificador
-        ACodBar := AnsiString(OnlyNumber(ConteudoBloco))
-
-      else
-        ACodBar := ConteudoBloco;
-
-      ACodBar:= LeftStr(ACodBar, 255);  // Tamanho máximo para Cod.Barras é 255 caracteres
-
-      BlocoTraduzido := FPosPrinterClass.ComandoCodBarras(ATag, ACodBar);
-    end;
+    BlocoTraduzido := FPosPrinterClass.ComandoCodBarras(ATag, ACodBar);
   end;
 
   GravarLog('TraduzirTagBloco(' + ATag + ', ' + ConteudoBloco + ') -> ' + BlocoTraduzido, True);
@@ -2417,7 +2501,7 @@ begin
   if not FInicializada then
   begin
     CmdInit := FPosPrinterClass.ComandoInicializa;
-    FInicializada := (pos( CmdInit, AString ) > 0);
+    FInicializada := (CmdInit = '') or (pos( CmdInit, AString ) > 0);
 
     if (not FInicializada) and (AString <> FPosPrinterClass.Cmd.Zera) then
     begin
@@ -2443,6 +2527,14 @@ begin
     if ControlePorta then
       DesativarPorta;
   end;
+end;
+
+function TACBrPosPrinter.DecodificarTagsFormatacao(ABinaryString: AnsiString
+  ): AnsiString;
+begin
+  FPosPrinterClass.AntesDecodificar( ABinaryString );
+  Result := FTagProcessor.DecodificarTagsFormatacao(ABinaryString);
+  FPosPrinterClass.DepoisDecodificar( Result );
 end;
 
 procedure TACBrPosPrinter.GravarLog(AString: AnsiString; Traduz: Boolean;
@@ -2921,7 +3013,7 @@ end;
 
 function TACBrPosPrinter.PodeLerDaPorta: Boolean;
 begin
-   Result := (FDevice.DeviceType in [dtSerial, dtTCP, dtHook, dtUSB, dtBlueTooth] )
+   Result := (FDevice.DeviceType in [dtNenhum, dtSerial, dtTCP, dtHook, dtUSB, dtBlueTooth] )
 end;
 
 procedure TACBrPosPrinter.SetAtivo(AValue: Boolean);
@@ -3014,11 +3106,11 @@ begin
   if (FPosPrinterClass.Cmd.PuloDeLinha <> LF) then
     StrToPrint := ReplaceString(StrToPrint, LF, FPosPrinterClass.Cmd.PuloDeLinha);
 
-  if DecodificarTags then
-    StrToPrint := FTagProcessor.DecodificarTagsFormatacao(StrToPrint);
-
   if PulaLinha then
     StrToPrint := StrToPrint + FPosPrinterClass.Cmd.PuloDeLinha;
+
+  if DecodificarTags then
+    StrToPrint := DecodificarTagsFormatacao(StrToPrint);
 
   //DEBUG
   //WriteLog('c:\temp\teste3.txt', StrToPrint, True);

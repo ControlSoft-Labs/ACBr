@@ -51,10 +51,12 @@ public final class ACBrPosPrinter extends ACBrLibBase implements AutoCloseable  
         int POS_Versao(ByteBuffer buffer, IntByReference bufferSize);
 
         int POS_UltimoRetorno(ByteBuffer buffer, IntByReference bufferSize);
-
-        int POS_ConfigLer(String eArqConfig);
         
-        int POS_ImportarConfig(String eArqConfig);
+        int POS_ConfigImportar(String eArqConfig);
+        
+	    int POS_ConfigExportar(ByteBuffer buffer, IntByReference bufferSize);
+        
+        int POS_ConfigLer(String eArqConfig);
 
         int POS_ConfigGravar(String eArqConfig);
 
@@ -180,8 +182,8 @@ public final class ACBrPosPrinter extends ACBrLibBase implements AutoCloseable  
         checkResult(ret);
     }
 
-    public void importarConfig(String eArqConfig) throws Exception {
-        int ret = PosPrinterLib.INSTANCE.POS_ImportarConfig(toUTF8(eArqConfig));
+    public void ConfigImportar(String eArqConfig) throws Exception {
+        int ret = PosPrinterLib.INSTANCE.POS_ConfigImportar(toUTF8(eArqConfig));
         checkResult(ret);
     }
 
@@ -301,7 +303,10 @@ public final class ACBrPosPrinter extends ACBrLibBase implements AutoCloseable  
         int ret = PosPrinterLib.INSTANCE.POS_AcharPortas(buffer, bufferLen);
         checkResult(ret);
 
-        return processResult(buffer, bufferLen).split("|");
+        String portas = processResult(buffer, bufferLen);
+        return Arrays.stream(portas.split("\\|"))
+                     .filter(x -> !x.isBlank() && !x.isEmpty())
+                     .toArray(String[]::new);
     }
     
     public void gravarLogoArquivo(String aPath) throws Exception {
@@ -432,6 +437,18 @@ public final class ACBrPosPrinter extends ACBrLibBase implements AutoCloseable  
         return processResult(buffer, bufferLen);
     }
 
+    public String ConfigExportar() throws Exception {
+		
+        ByteBuffer buffer = ByteBuffer.allocate(STR_BUFFER_LEN);
+        IntByReference bufferLen = new IntByReference(STR_BUFFER_LEN);
+
+        int ret = PosPrinterLib.INSTANCE.POS_ConfigExportar(buffer, bufferLen);
+        checkResult(ret);
+
+        return fromUTF8(buffer, bufferLen.getValue());
+		
+    }
+    
     @Override
     protected void UltimoRetorno(ByteBuffer buffer, IntByReference bufferLen) {
         PosPrinterLib.INSTANCE.POS_UltimoRetorno(buffer, bufferLen);

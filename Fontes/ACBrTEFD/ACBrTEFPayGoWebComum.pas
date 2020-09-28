@@ -71,10 +71,14 @@ const
   {$IFDEF MSWINDOWS}
    CACBrTEFPGWebLib = 'PGWebLib.dll';
   {$ELSE}
-   CACBrTEFPGWebLib = 'PGWebLib.so';
-  {$ENDIF}
+   {$IFDEF ANDROID}
+    CACBrTEFPGWebLib = 'libPOSPlug.so';
+   {$ELSE}
+    CACBrTEFPGWebLib = 'PGWebLib.so';
+   {$ENDIF}
+ {$ENDIF}
 
-  CACBrTEFPGWebLibMinVersion = '0004.0000.0082.0003';
+  CACBrTEFPGWebLibMinVersion = '0004.0000.0064.0000';
 
   CSleepNothing = 300;
   CMilissegundosMensagem = 5000;  // 5 seg
@@ -319,6 +323,7 @@ const
 //==========================================================================================
 // Tipos utilizados na captura de dados dinamica
 //==========================================================================================
+  PWDAT_NONE         = 0;   // tipo inválido, ignorar...
   PWDAT_MENU         = 1;   // menu de opções
   PWDAT_TYPED        = 2;   // entrada digitada
   PWDAT_CARDINF      = 3;   // dados de cartão
@@ -765,7 +770,10 @@ implementation
 
 uses
   StrUtils, dateutils, math, typinfo,
-  ACBrConsts, ACBrUtil, ACBrValidador;
+  ACBrConsts, ACBrUtil, ACBrValidador
+  {$IfDef ANDROID}
+   ,System.IOUtils
+  {$EndIf};
 
 function PWRETToString(iRET: SmallInt): String;
 begin
@@ -1131,7 +1139,17 @@ begin
   if (fDiretorioTrabalho = '') then
     fDiretorioTrabalho := ApplicationPath + 'TEF' + PathDelim + 'PGWeb';
 
+  {$IfDef ANDROID}
+   if (PathLib = '') then     // Try to load from "./assets/internal/" first
+   begin
+     PathLib := TPath.GetDocumentsPath;
+     if not FileExists(LibFullName) then
+       PathLib := '';
+   end;
+  {$EndIf}
+
   LoadLibFunctions;
+
   if not DirectoryExists(fDiretorioTrabalho) then
     ForceDirectories(fDiretorioTrabalho);
 
@@ -1418,11 +1436,10 @@ begin
       iRet := PWRET_OK;
       while (iRet = PWRET_OK) or (iRet = PWRET_NOTHING) or (iRet = PWRET_MOREDATA) do
       begin
-        NumParams := Length(ArrParams);
+        Initialize(ArrParams);
+        NumParams := Length(ArrParams)-1;
         GravarLog('PW_iExecTransac()');
-        {$warnings off}
         iRet := xPW_iExecTransac(ArrParams, NumParams);
-        {$warnings on}
         GravarLog('  '+PWRETToString(iRet)+', NumParams: '+IntToStr(NumParams));
 
         case iRet of
@@ -1504,8 +1521,15 @@ begin
         if (iRet = PWRET_OK) then
         begin
           AData := BinaryStringToString(AnsiString(pszData));
-          fDadosTransacao.Add(Format('%d=%s', [i, Adata]));  // Add é mais rápido que usar "ValueInfo[i]"
           GravarLog('  '+Format('%s=%s', [InfoStr, AData]));
+
+          if (i = PWINFO_RCPTCHSHORT) and (not ImprimirViaClienteReduzida) then
+          begin
+            GravarLog('    PWINFO_RCPTCHSHORT ignored, ImprimirViaClienteReduzida = False');
+            Continue;
+          end;
+
+          fDadosTransacao.Add(Format('%d=%s', [i, Adata]));  // Add é mais rápido que usar "ValueInfo[i]"
           if (i = PWINFO_IDLEPROCTIME) then
             TempoOcioso := AData;
         end;
@@ -1742,6 +1766,8 @@ begin
       while (iRet = PWRET_OK) and (j <= max(AGetData.bNumeroCapturas,1)) do
       begin
         case AGetData.bTipoDeDado of
+          PWDAT_NONE:
+            ;  // Registro inválido, ignore...
           PWDAT_MENU:
             iRet := ObterDadoMenu(AGetData);
           PWDAT_TYPED, PWDAT_USERAUTH:
@@ -1882,6 +1908,7 @@ function TACBrTEFPGWebAPI.ObterDadoDigitado(AGetData: TPW_GetData): SmallInt;
 var
   AResposta: String;
 begin
+  AResposta := '';
   if ObterDadoDigitadoGenerico(AGetData, AResposta) then
   begin
     if (AGetData.wIdentificador = PWINFO_MERCHCNPJCPF) then
@@ -2538,7 +2565,7 @@ procedure TACBrTEFPGWebAPI.LoadLibFunctions;
    PGWebFunctionDetect('PW_iPPGetUserData', @xPW_iPPGetUserData);
    PGWebFunctionDetect('PW_iPPWaitEvent', @xPW_iPPWaitEvent);
    PGWebFunctionDetect('PW_iPPRemoveCard', @xPW_iPPRemoveCard);
-   PGWebFunctionDetect('PW_iPPGetPINBlock', @xPW_iPPGetPINBlock);
+   //PGWebFunctionDetect('PW_iPPGetPINBlock', @xPW_iPPGetPINBlock);
    PGWebFunctionDetect('PW_iTransactionInquiry', @xPW_iTransactionInquiry);
    //try
    //  PGWebFunctionDetect('PW_iGetOperationsEx', @xPW_iGetOperationsEx);

@@ -269,7 +269,7 @@ begin
     Add('qCarga', ftCurrency);
     Add('dhIniViagem', ftDateTime);
     Add('Lacres', ftMemo);
-	  Add('vCarga', ftCurrency);
+    Add('vCarga', ftCurrency);
 
     // Outros
     Add('URL', ftString, 1000);
@@ -306,8 +306,8 @@ begin
     Close;
     Clear;
     // Aereo
-    Add('nac', ftInteger);
-    Add('matr', ftInteger);
+    Add('nac', ftString, 4);
+    Add('matr', ftString, 6);
     Add('nVoo', ftString, 9);
     Add('cAerEmb', ftString, 4);
     Add('cAerDes', ftString, 4);
@@ -1560,8 +1560,8 @@ begin
   with cdsModalAereo, FMDFe.aereo do
   begin
     Append;
-    FieldByName('nac').AsInteger    := nac;
-    FieldByName('matr').AsInteger   := matr;
+    FieldByName('nac').AsString     := nac;
+    FieldByName('matr').AsString    := matr;
     FieldByName('nVoo').AsString    := nVoo;
     FieldByName('cAerEmb').AsString := cAerEmb;
     FieldByName('cAerDes').AsString := cAerDes;
